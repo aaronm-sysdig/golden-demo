@@ -6,9 +6,9 @@
 
 **Architecture:** A minimal Struts2 WAR served by Tomcat connects to Postgres using credentials injected as environment variables (mirroring the Kubernetes Secret pattern Plan 2 will use). The portal is vulnerable to the S2-045 Jakarta Multipart OGNL injection, which reflects arbitrary command output in the HTTP response. The exploit needs no attacker callback infrastructure - everything happens in one request, which suits the air-gapped narrative.
 
-**Tech Stack:** Java 8, Apache Struts2 2.5.10, Maven (multi-stage Docker build), Tomcat 8.5 (jre8), PostgreSQL, postgresql-client, docker-compose, curl.
+**Tech Stack:** Java 8, Apache Struts2 2.5.10, Maven (multi-stage Docker build), Tomcat 8.5 (jre8), PostgreSQL, postgresql-client, a Docker user-defined network, curl.
 
-**Prerequisites for execution:** Docker and docker-compose installed. Internet access *at build time only* (Maven and base-image pulls); the resulting images are self-contained for air-gapped use.
+**Prerequisites for execution:** Docker running (colima or Docker Desktop). No docker-compose required - containers are wired with a plain Docker network and run scripts. Internet access *at build time only* (Maven and base-image pulls); the resulting images are self-contained for air-gapped use.
 
 ---
 
@@ -22,7 +22,8 @@
 - `app/src/main/webapp/customers.jsp` - renders the customer list.
 - `app/Dockerfile` - multi-stage: Maven build then Tomcat runtime with psql client.
 - `db/initdb/seed.sql` - creates and seeds the `customers` table with fake PII.
-- `docker-compose.yml` - wires portal + postgres, injects DB creds into the portal as env vars.
+- `scripts/run-local.sh` - creates a Docker network, starts postgres + portal, injects DB creds into the portal as env vars.
+- `scripts/stop-local.sh` - removes the containers and network.
 - `scripts/exploit-local.sh` - the three escalating curls (prove RCE, steal creds, steal table).
 - `.gitignore` - ignore Maven `target/`.
 - `README.md` - one-paragraph orientation + how to run locally.
@@ -59,8 +60,9 @@ Design: `docs/superpowers/specs/2026-06-04-sysdig-golden-demo-design.md`
 ## Run the core locally (Plan 1)
 
 ```bash
-docker compose up --build -d
+./scripts/run-local.sh
 ./scripts/exploit-local.sh
+./scripts/stop-local.sh
 ```
 
 WARNING: this project is intentionally vulnerable. Never expose it to an
@@ -386,48 +388,66 @@ git commit -m "Add Postgres seed of fake customer PII"
 
 ---
 
-## Task 5: Wire portal + database with docker-compose
+## Task 5: Wire portal + database on a Docker network
 
 **Files:**
-- Create: `docker-compose.yml`
+- Create: `scripts/run-local.sh`
+- Create: `scripts/stop-local.sh`
 
-- [ ] **Step 1: Write `docker-compose.yml`**
+No docker-compose: a user-defined Docker network gives the portal DNS resolution
+of the `postgres` container by name. This works identically under colima.
 
-```yaml
-services:
-  postgres:
-    image: postgres:13
-    environment:
-      POSTGRES_USER: portal
-      POSTGRES_PASSWORD: s3cr3t
-      POSTGRES_DB: customers
-    volumes:
-      - ./db/initdb:/docker-entrypoint-initdb.d:ro
+- [ ] **Step 1: Write `scripts/run-local.sh`**
 
-  portal:
-    build: ./app
-    image: golden-demo/portal:vuln
-    depends_on:
-      - postgres
-    environment:
-      PGHOST: postgres
-      PGDATABASE: customers
-      PGUSER: portal
-      PGPASSWORD: s3cr3t
-    ports:
-      - "8080:8080"
+```bash
+#!/usr/bin/env bash
+# Build and start the portal + Postgres on a shared Docker network.
+set -euo pipefail
+
+NET=golden-demo
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+docker network inspect "$NET" >/dev/null 2>&1 || docker network create "$NET"
+docker rm -f portal postgres >/dev/null 2>&1 || true
+
+docker run -d --name postgres --network "$NET" \
+  -e POSTGRES_USER=portal -e POSTGRES_PASSWORD=s3cr3t -e POSTGRES_DB=customers \
+  -v "$ROOT/db/initdb:/docker-entrypoint-initdb.d:ro" \
+  postgres:13
+
+docker build -t golden-demo/portal:vuln "$ROOT/app"
+
+# PGPASSWORD is deliberately in the portal env - it is exactly what the attacker
+# steals. Mirrors the Kubernetes Secret-to-env pattern Plan 2 uses.
+docker run -d --name portal --network "$NET" \
+  -e PGHOST=postgres -e PGDATABASE=customers -e PGUSER=portal -e PGPASSWORD=s3cr3t \
+  -p 8080:8080 \
+  golden-demo/portal:vuln
+
+echo "Started. Give Tomcat ~20s to deploy the WAR."
 ```
 
-Note: `PGPASSWORD` is deliberately present in the portal's environment - it is
-exactly what the attacker steals in the exploit. This mirrors the Kubernetes
-Secret-to-env pattern Plan 2 uses.
+- [ ] **Step 2: Write `scripts/stop-local.sh`**
 
-- [ ] **Step 2: Bring the stack up**
+```bash
+#!/usr/bin/env bash
+# Remove the local demo containers and network.
+set -euo pipefail
+docker rm -f portal postgres >/dev/null 2>&1 || true
+docker network rm golden-demo >/dev/null 2>&1 || true
+echo "Stopped and cleaned up."
+```
 
-Run: `docker compose up --build -d`
-Expected: both `postgres` and `portal` containers running. Verify with `docker compose ps`.
+- [ ] **Step 3: Start the stack**
 
-- [ ] **Step 3: Verify the portal legitimately reads the DB (test for this task)**
+Run:
+```bash
+chmod +x scripts/run-local.sh scripts/stop-local.sh
+./scripts/run-local.sh
+```
+Expected: both `postgres` and `portal` containers running. Verify with `docker ps --format '{{.Names}}'` (shows `portal` and `postgres`).
+
+- [ ] **Step 4: Verify the portal legitimately reads the DB (test for this task)**
 
 Run:
 ```bash
@@ -437,11 +457,11 @@ curl -s http://localhost:8080/customers.action | grep -i "example.com"
 Expected: at least one seeded customer email appears in the rendered page. This
 proves the portal genuinely connects to Postgres using the env credentials.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add docker-compose.yml
-git commit -m "Wire portal and Postgres with docker-compose"
+git add scripts/run-local.sh scripts/stop-local.sh
+git commit -m "Add local run/stop scripts wiring portal and Postgres on a Docker network"
 ```
 
 ---
@@ -509,7 +529,7 @@ run "STEP 3: dump customer table" \
 Run:
 ```bash
 chmod +x scripts/exploit-local.sh
-docker compose up -d
+./scripts/run-local.sh
 sleep 20
 ```
 Expected: no error; portal reachable.
@@ -542,10 +562,9 @@ git commit -m "Add local reflected-RCE exploit proving credential and data theft
 
 - [ ] **Step 1: Scan the portal image**
 
-Run (trivy shown; sysdig-cli-scanner is swapped in during Plan 2 at test time):
+Run (native trivy; sysdig-cli-scanner is swapped in during Plan 2 at test time):
 ```bash
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-  aquasec/trivy:latest image golden-demo/portal:vuln | grep -i "CVE-2017-5638"
+trivy image --scanners vuln golden-demo/portal:vuln | grep -i "CVE-2017-5638"
 ```
 Expected: a line referencing `CVE-2017-5638` against `struts2-core`.
 
@@ -558,8 +577,8 @@ the scanner's Java/jar analysis is enabled. Note the outcome in
 
 - [ ] **Step 3: Tear down the local stack**
 
-Run: `docker compose down -v`
-Expected: containers and volumes removed.
+Run: `./scripts/stop-local.sh`
+Expected: containers and network removed.
 
 ---
 
