@@ -19,6 +19,9 @@ public class CustomerAction extends ActionSupport {
         String user = env("PGUSER", "portal");
         String pass = env("PGPASSWORD", "");
         String url = "jdbc:postgresql://" + host + ":5432/" + db;
+        try {
+            Class.forName("org.postgresql.Driver");
+        } catch (ClassNotFoundException ignored) {}
         try (Connection c = DriverManager.getConnection(url, user, pass);
              Statement s = c.createStatement();
              ResultSet rs = s.executeQuery("SELECT name, email FROM customers LIMIT 5")) {
