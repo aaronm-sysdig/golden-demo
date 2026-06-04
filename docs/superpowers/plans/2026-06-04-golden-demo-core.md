@@ -591,8 +591,8 @@ Expected: containers and network removed.
   config) and the orchestration scripts/runbook are deferred to Plan 2 because
   they require the live cluster and backend.
 - The credential names (`PGHOST`/`PGDATABASE`/`PGUSER`/`PGPASSWORD`) are
-  consistent across `CustomerAction.java`, `docker-compose.yml`, and
-  `exploit-local.sh`.
+  consistent across `CustomerAction.java`, `scripts/run-local.sh`, and
+  `scripts/exploit-local.sh`.
 - No placeholders: every file has complete content and every verification step
   has an exact command and expected output.
 ```

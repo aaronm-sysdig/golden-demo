@@ -230,6 +230,37 @@ These are not coded in the repo; the runbook gives click-by-click steps:
 - Response/detection latency, and the tunable delay needed so the Pause action
   reliably wins the race in Run 2.
 
+## 15. Findings from Plan 1 execution (2026-06-04)
+
+Plan 1 (the locally-verifiable core) was built and verified end to end. Key
+findings that feed into Plan 2:
+
+- **Exploit confirmed.** CVE-2017-5638 returns command output reflected in the
+  HTTP response. The working trigger is a `POST` with a small body
+  (`--data 'x=1'`) and the OGNL expression in the `Content-Type` header; a plain
+  GET does not invoke the Jakarta multipart parser path. The server closes the
+  connection after the payload flushes, so curl exits 18 (benign, suppressed).
+  RCE runs as `root`. All three beats proven: `id`, env-dump of DB creds, and a
+  full `pg_dump` of the customer table.
+- **Image architecture.** Images were built on Apple Silicon (colima) and are
+  therefore `arm64`. The base tags were substituted to arm64-available ones:
+  build stage `maven:3.6.3-amazoncorretto-8`, runtime `tomcat:8.5.99-jre8-temurin`.
+  For Plan 2, build for the cluster's architecture (`docker build --platform
+  linux/amd64 ...` if the on-prem nodes are amd64) and pre-load into the
+  registry.
+- **Base-image CVE count.** `tomcat:8.5.99` is a recent 8.5 patch, so the bonus
+  base-image CVEs are fewer than a truly old tag would give. The headline
+  CVE-2017-5638 lives in the WAR's `struts2-core-2.5.10.jar`, so the scan story
+  holds regardless. If a richer base-image finding list is wanted on screen,
+  pin an older Tomcat/JRE base in Plan 2.
+- **JDBC driver registration.** Tomcat's web classloader did not auto-discover
+  the Postgres JDBC driver via ServiceLoader; `CustomerAction` calls
+  `Class.forName("org.postgresql.Driver")` explicitly. Carry this forward.
+- **Runbook cosmetic.** `env | grep -i PG` also matches `GPG_KEYS` (noise). Use a
+  tighter filter (e.g. `grep PGPASSWORD`) in the on-stage exploit for a cleaner
+  read, while keeping the `env | grep` shape that the "Dump Sensitive
+  Environment Variables" rule needs.
+
 ## 14. Success criteria
 
 - One `build.sh` produces all images and loads them into the target registry.
