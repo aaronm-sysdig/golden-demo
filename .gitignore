@@ -1,0 +1,4 @@
+target/
+*.war
+*.class
+.DS_Store
