@@ -289,6 +289,53 @@ on-prem Sysdig, not SaaS, which is the literal truth being narrated).
   on the vulnerable image is a Sysdig-side policy setting to verify at deploy
   time (the narrative needs warn-then-deploy-anyway, not a hard block).
 
+## 17. Findings from Plan 2 execution (2026-06-05)
+
+Plan 2 (EKS deploy + end-to-end verification) was built and verified. Key findings:
+
+### Build-time scan (beat 1) - CONFIRMED
+`sysdig-cli-scanner` against on-prem backend on ECR image
+`059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/portal:vuln`:
+- 311 vulns total: 11 Critical (all fixable), 21 High, 186 Medium, 88 Low.
+- `struts2-core 2.5.10`: 7 Critical, 13 High, 9 with known exploits. Fix: 2.5.22.
+- `postgresql 42.2.5`: 3 Critical, 3 High.
+- `commons-fileupload 1.3.2`: 1 Critical, 2 High.
+- Scan result also surfaces base-image OS CVEs (libgnutls30, libc6, etc.).
+
+### Deploy-time admission (beat 2) - CONFIRMED
+AC in warn mode prints to kubectl on CREATE/UPDATE of the portal Deployment:
+```
+Warning: [VM Engine] Failed checks for container portal. Failing policies: [Sysdig Best Practices]
+Warning: Violations: x Fixable  x Fixable since 30 days  x Network attack vector
+Warning: x Severity equal critical  x Severity equal high  x Severity greater than or equal high
+deployment.apps/portal created
+```
+Warn mode allows the deploy. Tested with `kubectl apply` and `kubectl create`.
+
+### Runtime detection (beat 3) - CONFIRMED (partial)
+Agent confirmed catching `Database Dump Command Detected` (WARNING, MITRE
+TA0006 credential-access / T1003 OS-credential-dumping) on the portal container:
+process lineage `java -> pg_dump` with the ECR image, user root. Fired twice per
+exploit run (consistent).
+
+Open item: **"Dump Sensitive Environment Variables" (CRITICAL) has NOT fired**
+despite the `env | grep -i PG` payload matching the rule condition. Possible
+causes: the rule may be in a policy not scoped to the cluster, or the piped-stdin
+detection (`proc.stdin.type=pipe`) is not satisfied in the container context.
+Needs investigation to close - this is the highest-priority item for Plan 3.
+
+### Probe noise fix
+Postgres `pg_isready` readinessProbe caused 150 "Read sensitive file untrusted"
+(WARNING) events per hour (libpq reads `/etc/shadow` on every exec). Switched to
+a `tcpSocket: 5432` probe - noise reduced to zero on the new pod. Fix is in
+`k8s/10-postgres.yaml`.
+
+### Admission controller behavior note
+The Sysdig validating webhook uses `failurePolicy: Ignore`, so if the backend
+is unreachable the deploy goes through silently. Warn mode (not Enforce) is
+correct for the demo narrative (developer deploys anyway). Server-side dry-run
+does NOT surface the warning - only real CREATE/UPDATE does.
+
 ## 14. Success criteria
 
 - One `build.sh` produces all images and loads them into the target registry.
