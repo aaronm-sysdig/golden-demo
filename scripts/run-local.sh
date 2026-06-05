@@ -18,7 +18,7 @@ docker build -t golden-demo/portal:vuln "$ROOT/app"
 # PGPASSWORD is deliberately in the portal env - it is exactly what the attacker
 # steals. Mirrors the Kubernetes Secret-to-env pattern Plan 2 uses.
 docker run -d --name portal --network "$NET" \
-  -e PGHOST=postgres -e PGDATABASE=customers -e PGUSER=portal -e PGPASSWORD=s3cr3t \
+  -e PGHOST=postgres -e PGDATABASE=customers -e PGUSER=portal -e DB_PASSWORD=s3cr3t \
   -p 8080:8080 \
   golden-demo/portal:vuln
 

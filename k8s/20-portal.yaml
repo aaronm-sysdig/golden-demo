@@ -29,7 +29,7 @@ spec:
                 secretKeyRef:
                   name: db-credentials
                   key: username
-            - name: PGPASSWORD
+            - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: db-credentials

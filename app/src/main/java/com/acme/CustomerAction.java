@@ -17,7 +17,7 @@ public class CustomerAction extends ActionSupport {
         String host = env("PGHOST", "postgres");
         String db = env("PGDATABASE", "customers");
         String user = env("PGUSER", "portal");
-        String pass = env("PGPASSWORD", "");
+        String pass = env("DB_PASSWORD", "");
         String url = "jdbc:postgresql://" + host + ":5432/" + db;
         try {
             Class.forName("org.postgresql.Driver");
