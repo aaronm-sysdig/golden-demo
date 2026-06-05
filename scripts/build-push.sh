@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
-# Build the portal for linux/amd64 and push to ECR in the cluster's account.
+# Builds the portal image for linux/amd64 and pushes to ECR.
+# Requires: aws cli authed, docker running.
+# ECR registry is derived from the current AWS account.
 set -euo pipefail
 
-export AWS_PROFILE=draios-dev
-ACCOUNT=059797578166
-REGION=ap-southeast-2
-REPO=golden-demo/portal
-TAG=vuln
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REGION=$(aws configure get region 2>/dev/null || echo "us-east-1")
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
-IMAGE="${REGISTRY}/${REPO}:${TAG}"
+IMAGE="${REGISTRY}/golden-demo/portal:vuln"
 
-aws ecr describe-repositories --region "$REGION" --repository-names "$REPO" >/dev/null 2>&1 \
-  || aws ecr create-repository --region "$REGION" --repository-name "$REPO" >/dev/null
+aws ecr describe-repositories --region "$REGION" \
+  --repository-names golden-demo/portal >/dev/null 2>&1 \
+  || aws ecr create-repository --region "$REGION" \
+       --repository-name golden-demo/portal >/dev/null
 
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "$REGISTRY"
 
-# EKS nodes are amd64; the build host (colima) is arm64, so set the platform.
 docker build --platform linux/amd64 -t "$IMAGE" "$ROOT/app"
 docker push "$IMAGE"
 echo "Pushed $IMAGE"
