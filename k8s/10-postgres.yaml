@@ -48,9 +48,11 @@ spec:
           volumeMounts:
             - name: initdb
               mountPath: /docker-entrypoint-initdb.d
+          # TCP probe (not pg_isready exec) - avoids the libpq /etc/shadow read
+          # that trips "Read sensitive file untrusted" on every probe interval.
           readinessProbe:
-            exec:
-              command: ["pg_isready", "-U", "portal"]
+            tcpSocket:
+              port: 5432
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
