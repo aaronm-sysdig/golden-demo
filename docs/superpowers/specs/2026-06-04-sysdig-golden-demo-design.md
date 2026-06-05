@@ -318,11 +318,24 @@ TA0006 credential-access / T1003 OS-credential-dumping) on the portal container:
 process lineage `java -> pg_dump` with the ECR image, user root. Fired twice per
 exploit run (consistent).
 
-Open item: **"Dump Sensitive Environment Variables" (CRITICAL) has NOT fired**
-despite the `env | grep -i PG` payload matching the rule condition. Possible
-causes: the rule may be in a policy not scoped to the cluster, or the piped-stdin
-detection (`proc.stdin.type=pipe`) is not satisfied in the container context.
-Needs investigation to close - this is the highest-priority item for Plan 3.
+### Runtime detection - CONFIRMED FINAL (2026-06-05 update)
+
+Four detections fire from a single curl, all within 200ms:
+
+| Step | Rule | Sysdig Severity |
+|---|---|---|
+| STEP 2 - base64 encoded payload | Base64-encoded Shell Script Execution | **3 (CRITICAL)** |
+| STEP 3 - cp to /dev/shm + exec | Execution from /dev/shm | **3 (CRITICAL)** |
+| STEP 3 side-effect | Privileged Shell Spawned Inside Container | 4 (High) |
+| STEP 4 - pg_dump | Database Dump Command Detected | 4 (High) |
+
+Sysdig severity scale: 1=Emergency, 2=Alert, 3=Critical, 4=High, 5=Medium, 6=Low, 7=Info.
+
+**"Dump Sensitive Environment Variables" (CRITICAL) is not triggerable from
+non-interactive RCE.** The rule requires `proc.pgid.name in (printenv, env)`,
+which only fires when bash runs with job control active (real TTY). From Java
+ProcessBuilder, bash is always the PGID leader. Coverage gap in the rule for
+scripted/RCE contexts - not a bug in the exploit. Closed - not pursued further.
 
 ### Probe noise fix
 Postgres `pg_isready` readinessProbe caused 150 "Read sensitive file untrusted"
