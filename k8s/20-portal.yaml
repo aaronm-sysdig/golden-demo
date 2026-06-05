@@ -16,6 +16,7 @@ spec:
       containers:
         - name: portal
           image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/portal:vuln
+          imagePullPolicy: Always
           env:
             - name: PGHOST
               value: postgres
