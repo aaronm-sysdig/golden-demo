@@ -261,6 +261,34 @@ findings that feed into Plan 2:
   read, while keeping the `env | grep` shape that the "Dump Sensitive
   Environment Variables" rule needs.
 
+## 16. Deployment target (decided 2026-06-05)
+
+The demo is built and tested on a real cluster (the "air-gapped on-prem"
+framing in sections 2/9 becomes talk-track; the backend is customer-managed
+on-prem Sysdig, not SaaS, which is the literal truth being narrated).
+
+- **Cluster:** EKS `cni-test-cluster`, AWS account `059797578166`,
+  region `ap-southeast-2`. Nodes are **amd64** (t3.medium, Amazon Linux 2), so
+  images must be built `--platform linux/amd64`.
+- **Auth:** kubectl and AWS both use `AWS_PROFILE=draios-dev` (that SSO role is
+  admin in `059797578166`; the machine's default AWS profile is a different
+  account, `892165838036`, so the profile must be set explicitly for ECR work).
+- **Registry:** ECR in `059797578166` (currently empty). Plan 2 creates a
+  `golden-demo/portal` repository there; EKS nodes pull natively via their node
+  role (same account).
+- **Exposure:** the portal Service is a **LoadBalancer** (must be reachable from
+  Aaron's Mac to fire the exploit curl). Supersedes the NodePort default in
+  section 11.
+- **Sysdig backend:** an on-prem Monitor+Secure stack built by the "OSC"
+  (Onprem Stack Creator) Jenkins job; cluster name `aaron-miles-osc-23825`. The
+  on-prem Sysdig Secure URL and a Secure API token are runbook/test-time inputs
+  (needed for `sysdig-cli-scanner` and UI backlinks).
+- **Agent + admission:** `sysdig-agent-shield` (cluster + host shield) and the
+  `sysdig-agent-shield-cluster-admission-control` validating webhook are already
+  installed in the `sysdig-agent` namespace. Whether admission warns vs blocks
+  on the vulnerable image is a Sysdig-side policy setting to verify at deploy
+  time (the narrative needs warn-then-deploy-anyway, not a hard block).
+
 ## 14. Success criteria
 
 - One `build.sh` produces all images and loads them into the target registry.
