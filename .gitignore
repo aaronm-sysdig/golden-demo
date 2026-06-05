@@ -2,3 +2,5 @@ target/
 *.war
 *.class
 .DS_Store
+.sysdig-token
+.env
