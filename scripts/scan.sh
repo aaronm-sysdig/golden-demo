@@ -7,16 +7,9 @@ set -euo pipefail
 # Accept SYSDIG_API_TOKEN or SECURE_API_TOKEN interchangeably
 SECURE_API_TOKEN="${SECURE_API_TOKEN:-${SYSDIG_API_TOKEN:-}}"
 : "${SECURE_API_TOKEN:?set SECURE_API_TOKEN or SYSDIG_API_TOKEN}"
-IMAGE="${IMAGE:-}"
+IMAGE="${IMAGE:-059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/portal:vuln}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-if [ -z "$IMAGE" ]; then
-  ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null \
-    || aws sts get-caller-identity --profile draios-dev --query Account --output text)
-  REGION=$(aws configure get region 2>/dev/null || echo "ap-southeast-2")
-  IMAGE="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/golden-demo/portal:vuln"
-fi
 
 BIN="$ROOT/sysdig-cli-scanner"
 if [ ! -x "$BIN" ]; then
