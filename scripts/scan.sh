@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Scan the portal image with sysdig-cli-scanner against the on-prem backend.
-# Usage: ./scan.sh <sysdig-secure-url> <api-token> [image]
-# Example: ./scan.sh https://sysdig.example.com mytoken123
+# Usage: SYSDIG_SECURE_URL=https://... SECURE_API_TOKEN=... ./scan.sh
 set -euo pipefail
 
-SYSDIG_SECURE_URL="${1:?Usage: scan.sh <sysdig-url> <api-token> [image]}"
-SECURE_API_TOKEN="${2:?Usage: scan.sh <sysdig-url> <api-token> [image]}"
-IMAGE="${3:-}"
+: "${SYSDIG_SECURE_URL:?set SYSDIG_SECURE_URL}"
+: "${SECURE_API_TOKEN:?set SECURE_API_TOKEN}"
+IMAGE="${IMAGE:-}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
