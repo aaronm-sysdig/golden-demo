@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: claude-demo
+  namespace: claude
+  labels:
+    app: claude-demo
+spec:
+  restartPolicy: Never
+  initContainers:
+    - name: copy-creds
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          mkdir -p /root/.claude
+          cp /secret/credentials.json /root/.claude/.credentials.json
+          chmod 600 /root/.claude/.credentials.json
+      volumeMounts:
+        - name: claude-credentials-secret
+          mountPath: /secret
+          readOnly: true
+        - name: claude-home
+          mountPath: /root/.claude
+  containers:
+    - name: claude
+      image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/claude-demo:v8
+      imagePullPolicy: IfNotPresent
+      command: ["sleep", "infinity"]
+      env:
+        - name: HOME
+          value: /root
+        - name: TERM
+          value: xterm-256color
+      volumeMounts:
+        - name: claude-home
+          mountPath: /root/.claude
+  volumes:
+    - name: claude-credentials-secret
+      secret:
+        secretName: claude-credentials
+        defaultMode: 0600
+    - name: claude-home
+      emptyDir: {}
