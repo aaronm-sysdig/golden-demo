@@ -1,0 +1,31 @@
+# Blast-radius control for the intentionally-vulnerable AI workload.
+# If the container is popped (CVE-2023-29374 RCE), this stops it reaching
+# anything useful: egress is denied by default, so it cannot pull node IAM
+# credentials from the IMDS endpoint (169.254.169.254), phone home to a C2,
+# or download a cryptominer. Only cluster DNS is allowed. Ingress is left
+# untouched so kubelet probes and `kubectl port-forward` still work.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langchain-ai-egress
+  namespace: ai-workload
+spec:
+  podSelector:
+    matchLabels:
+      app: langchain-ai
+  policyTypes:
+    - Egress
+  egress:
+    # DNS only.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

@@ -19,6 +19,6 @@ aws ecr get-login-password --region "$REGION" --profile draios-dev \
   | docker login --username AWS --password-stdin "$REGISTRY"
 
 docker build --platform linux/amd64 -t "$IMAGE" "$ROOT/app"
-./scan.sh || true
+# ./scan.sh || true
 docker push "$IMAGE"
 echo "Pushed $IMAGE"

@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ai-credentials
+  namespace: ai-workload
+type: Opaque
+stringData:
+  # Fake credentials - exactly what the attacker steals from the environment.
+  # Mirrors the Secret-to-env pattern a real AI workload uses for model keys.
+  openai-api-key: sk-demo-FAKEKEY-do-not-use-0000000000000000
+  anthropic-api-key: sk-ant-demo-FAKEKEY-do-not-use-0000000000
+  db-password: s3cr3t
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langchain-ai
+  namespace: ai-workload
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langchain-ai
+  template:
+    metadata:
+      labels:
+        app: langchain-ai
+    spec:
+      containers:
+        - name: langchain-ai
+          image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/ai-workload:vuln
+          imagePullPolicy: Always
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-credentials
+                  key: openai-api-key
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-credentials
+                  key: anthropic-api-key
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ai-credentials
+                  key: db-password
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langchain-ai
+  namespace: ai-workload
+spec:
+  # ClusterIP - NOT internet-exposed. Sysdig still sees the image and all
+  # runtime activity (the agent watches the pod, not the LB). Reach it for the
+  # demo with: kubectl port-forward -n ai-workload svc/langchain-ai 8088:80
+  # Only switch to type: LoadBalancer if you deliberately need external access,
+  # and then lock it down with loadBalancerSourceRanges to your current IP.
+  type: ClusterIP
+  selector:
+    app: langchain-ai
+  ports:
+    - port: 80
+      targetPort: 8080

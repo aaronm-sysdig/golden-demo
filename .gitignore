@@ -4,3 +4,10 @@ target/
 .DS_Store
 .sysdig-token
 .env
+
+# Sysdig scanner binary (~118MB) and scan output - not source
+sysdig-cli-scanner
+scan-logs
+# Local scratch DB
+main.db/
+main.db.meta.json

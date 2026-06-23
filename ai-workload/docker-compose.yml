@@ -1,0 +1,6 @@
+services:
+  langchain-demo:
+    build: .
+    container_name: langchain-demo
+    ports:
+      - "8080:8080"
