@@ -16,6 +16,7 @@ the exploit is genuine end-to-end code execution in the container.
 import os
 from typing import List, Optional
 
+import mlflow  # noqa: F401 - imported for runtime sensor visibility (inUse=true)
 from flask import Flask, jsonify, request
 from langchain import LLMMathChain
 from langchain.llms.base import LLM
