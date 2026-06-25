@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: db-credentials
-  namespace: golden-demo
+  namespace: customer-portal
 type: Opaque
 stringData:
   username: portal
@@ -13,7 +13,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
-  namespace: golden-demo
+  namespace: customer-portal
 spec:
   replicas: 1
   selector:
@@ -64,7 +64,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: golden-demo
+  namespace: customer-portal
 spec:
   selector:
     app: postgres

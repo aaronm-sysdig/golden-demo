@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-NS=golden-demo
+NS=customer-portal
 
 kubectl apply -f "$ROOT/k8s/00-namespace.yaml"
 kubectl create configmap pg-initdb --from-file="$ROOT/db/initdb/seed.sql" \

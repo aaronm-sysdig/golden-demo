@@ -8,12 +8,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGION=$(aws configure get region 2>/dev/null || echo "us-east-1")
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile draios-dev)
 REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
-IMAGE="${REGISTRY}/golden-demo/portal:vuln"
+IMAGE="${REGISTRY}/customer-portal/portal:2.5.10"
 
 aws ecr describe-repositories --region "$REGION" --profile draios-dev \
-  --repository-names golden-demo/portal >/dev/null 2>&1 \
-  || aws ecr create-repository --region "$REGION" \
-       --repository-name golden-demo/portal >/dev/null
+  --repository-names customer-portal/portal >/dev/null 2>&1 \
+  || aws ecr create-repository --region "$REGION" --profile draios-dev \
+       --repository-name customer-portal/portal >/dev/null
 
 aws ecr get-login-password --region "$REGION" --profile draios-dev \
   | docker login --username AWS --password-stdin "$REGISTRY"

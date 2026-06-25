@@ -7,12 +7,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REGION=ap-southeast-2
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile draios-dev)
 REGISTRY="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com"
-IMAGE="${REGISTRY}/golden-demo/ai-workload:vuln"
+IMAGE="${REGISTRY}/ai-workload/langchain:1.0.2"
 
 aws ecr describe-repositories --region "$REGION" --profile draios-dev \
-  --repository-names golden-demo/ai-workload >/dev/null 2>&1 \
+  --repository-names ai-workload/langchain >/dev/null 2>&1 \
   || aws ecr create-repository --region "$REGION" --profile draios-dev \
-       --repository-name golden-demo/ai-workload >/dev/null
+       --repository-name ai-workload/langchain >/dev/null
 
 aws ecr get-login-password --region "$REGION" --profile draios-dev \
   | docker login --username AWS --password-stdin "$REGISTRY"

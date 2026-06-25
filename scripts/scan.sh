@@ -7,7 +7,7 @@ set -euo pipefail
 # Accept SYSDIG_API_TOKEN or SECURE_API_TOKEN interchangeably
 SECURE_API_TOKEN="${SECURE_API_TOKEN:-${SYSDIG_API_TOKEN:-}}"
 : "${SECURE_API_TOKEN:?set SECURE_API_TOKEN or SYSDIG_API_TOKEN}"
-IMAGE="${IMAGE:-059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/portal:vuln}"
+IMAGE="${IMAGE:-059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/customer-portal/portal:2.5.10}"
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 

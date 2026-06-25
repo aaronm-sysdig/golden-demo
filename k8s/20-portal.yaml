@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: portal
-  namespace: golden-demo
+  namespace: customer-portal
 spec:
   replicas: 1
   selector:
@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: portal
-          image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/portal:vuln
+          image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/customer-portal/portal:2.5.10
           imagePullPolicy: Always
           env:
             - name: PGHOST
@@ -48,14 +48,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: portal
-  namespace: golden-demo
+  namespace: customer-portal
 spec:
   # ClusterIP - NOT internet-exposed. The portal runs an intentionally
   # vulnerable Struts2 (CVE-2017-5638), which is mass-scanned across the
   # internet, so it must never sit behind a public LoadBalancer. Sysdig still
   # sees the image and all runtime activity (it watches the pod, not the LB).
   # Reach it for the demo with:
-  #   kubectl port-forward -n golden-demo svc/portal 8080:80
+  #   kubectl port-forward -n customer-portal svc/portal 8080:80
   type: ClusterIP
   selector:
     app: portal

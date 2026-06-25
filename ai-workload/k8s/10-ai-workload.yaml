@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: langchain-ai
-          image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/golden-demo/ai-workload:vuln
+          image: 059797578166.dkr.ecr.ap-southeast-2.amazonaws.com/ai-workload/langchain:1.0.2
           imagePullPolicy: Always
           env:
             - name: OPENAI_API_KEY

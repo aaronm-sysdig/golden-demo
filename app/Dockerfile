@@ -13,4 +13,5 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 RUN rm -rf /usr/local/tomcat/webapps/*
 COPY --from=build /src/target/customer-portal.war /usr/local/tomcat/webapps/ROOT.war
+RUN mkdir -p /root/.aws && printf '[default]\naws_access_key_id = AKIAIOSFODNN7EXAMPLE\naws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\nregion = ap-southeast-2\n' > /root/.aws/credentials
 EXPOSE 8080
