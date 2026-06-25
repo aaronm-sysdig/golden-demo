@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-cook-portal-demo.py
+portal-report.py
 
-Fills golden-sample-portal.tmpl.md with timestamps anchored to now
-(or a provided UTC time) and writes:
+Generates a timestamped investigation report from golden-sample-portal.tmpl.md,
+anchored to the current time (or a provided UTC time), and writes:
   /tmp/portal-investigation-latest.md
   /tmp/portal-investigation-latest.html  (browser-ready, Mermaid-capable)
 
 Usage:
-  python3 scripts/cook-portal-demo.py                     # anchor = now
-  python3 scripts/cook-portal-demo.py 2026-06-25T14:30Z   # explicit UTC anchor
+  python3 scripts/portal-report.py                     # anchor = now
+  python3 scripts/portal-report.py 2026-06-25T14:30Z   # explicit UTC anchor
 
 Token -> original value mapping:
   {{DATE}}     2026-06-25   (attack date)
