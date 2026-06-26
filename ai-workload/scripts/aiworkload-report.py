@@ -150,6 +150,8 @@ def main():
 
     print(f"  Anchor: {ts} UTC")
     print(f"  Open:   file://{OUT_HTML}")
+    import subprocess
+    subprocess.run(["open", "-a", "Google Chrome", f"file://{OUT_HTML}"], check=False)
 
 
 if __name__ == "__main__":
