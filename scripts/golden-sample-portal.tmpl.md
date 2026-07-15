@@ -12,11 +12,18 @@ A public-facing Apache Tomcat workload (`portal-dd9dd888-ffwxk`, image `customer
 
 - **Trigger:** `Contact EC2 Instance Metadata Service From Container` (the climax / Credential Access), preceded in the same burst by `Execution from /dev/shm`, `Base64-encoded Shell Script Execution`, and `Database Dump Command Detected`. Threat group named "Process Injection, Hide Artifacts on Kubernetes Cluster" (Defense Evasion rollup).
 - **Process tree (from `get_event_process_tree`, event `18bc3a1f…`):** all children hang directly off the Tomcat JVM, confirming web-app RCE entry:
-  - `java` (Tomcat `org.apache.catalina.startup.Bootstrap`, pid 1262189, up {{T_TOMCAT}}Z)
-    - → `bash -c "cp /usr/bin/env /dev/shm/.recon && /dev/shm/.recon | grep -iE '^(PG|DB_|DATABASE|POSTGRES)' ; rm -f /dev/shm/.recon"` → `/dev/shm/.recon` *({{T0}}Z — env-var recon for DB creds, hidden in shared memory)*
-    - → `bash -c "$(echo <base64> | base64 -d)"` *({{T1}}Z)* decoding to: `#!/bin/bash` / `PGPASSWORD=$DB_PASSWORD pg_dump -h $PGHOST -U $PGUSER -t customers --data-only $PGDATABASE`
-    - → `perl /usr/bin/pg_dump …` → `/usr/lib/postgresql/14/bin/pg_dump -h postgres -U portal -t customers --data-only customers` *({{T1}}Z — bulk customer-data exfil)*
-    - → `bash -c "curl -sf --connect-timeout 3 http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null"` → `curl` *({{T2}}Z — IMDS IAM credential theft)*
+
+  ```
+  java (org.apache.catalina.startup.Bootstrap, pid 1262189, running since {{T_TOMCAT}}Z)
+   ├─ bash -c "cp /usr/bin/env /dev/shm/.recon && /dev/shm/.recon | grep -iE '^(PG|DB_|DATABASE|POSTGRES)'; rm -f /dev/shm/.recon"
+   │    └─ /dev/shm/.recon           (env renamed + staged in /dev/shm — {{T0}}Z, T1564/T1552.001)
+   ├─ bash -c "$(echo <base64> | base64 -d)"   (T1027 obfuscated loader — {{T1}}Z)
+   │    decodes to: PGPASSWORD=$DB_PASSWORD pg_dump -h $PGHOST -U $PGUSER -t customers --data-only $PGDATABASE
+   │    └─ perl /usr/bin/pg_dump
+   │    └─ /usr/lib/postgresql/14/bin/pg_dump -h postgres -U portal -t customers --data-only customers
+   └─ bash -c "curl -sf --connect-timeout 3 http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null"
+        └─ curl 169.254.169.254 (IMDS, T1552.005 — {{T2}}Z)
+  ```
 - **Process evidence (parsed from `aiGeneratedDescription`):** "Java process linked to Apache Tomcat", "pg_dump", "copying `env` to `/dev/shm/.recon`", "filtering for database-related environment variables", "curl to the EC2 Instance Metadata Service for IAM security credentials". Note: the AI rollup leans toward "routine administrative activity" — the process tree contradicts that read.
 - **Resource:** `sysdn03` (EKS) / `customer-portal` / deployment `portal`, pod `portal-dd9dd888-ffwxk`, container `ba0d9712d1bf`, on node/EC2 `i-038244f3e51c4ade3` (`ip-192-168-80-223`), AWS account `059797578166`, ap-southeast-2.
 - **AI-generated rationale:** flags possible data extraction, reconnaissance of DB env vars, base64 obfuscation, and IMDS access as a "coordinated effort warranting investigation."
@@ -25,6 +32,11 @@ A public-facing Apache Tomcat workload (`portal-dd9dd888-ffwxk`, image `customer
 
 ```mermaid
 flowchart LR
+  subgraph attacker["Attacker (public HTTP / kubectl)"]
+    http(("Crafted HTTP request<br/>Struts2 OGNL injection"))
+    pf(("kubectl port-forward"))
+  end
+
   subgraph container["Container ba0d9712d1bf — pod portal-dd9dd888-ffwxk<br/>image customer-portal/portal:2.5.10"]
     entry["java / Tomcat (Bootstrap)<br/>Struts2-core 2.5.10<br/>CVE-2017-5638 (OGNL RCE, KEV)"]:::entrypoint
     a1["bash: cp env -&gt; /dev/shm/.recon<br/>grep PG|DB_|DATABASE|POSTGRES<br/>{{T0}}"]
@@ -45,6 +57,8 @@ flowchart LR
     iam_role[("IAM role temp creds<br/>(node instance profile)")]
   end
 
+  http -. "OGNL RCE" .-> entry
+  pf -. "tunnel to pod" .-> entry
   entry -- "{{T0}} spawns" --> a1
   entry -- "{{T1}} spawns" --> a2
   a2 -- "decodes & runs" --> a3
@@ -60,6 +74,7 @@ flowchart LR
 
   class a1,a2,a3,a4 malicious;
   class pg,imds,iam_role cloud;
+  class http,pf external;
 ```
 
 #### Timeline (compact)
@@ -89,14 +104,20 @@ Cloud-API summary: no CloudTrail evidence was pulled this run, so post-theft use
 
 `customer-portal/portal:2.5.10` (digest `sha256:f0267a20…`, Ubuntu 22.04 base, scanned {{DATE}}T{{T_SCAN}}Z), policy **failed**:
 - **Counts:** 38 critical / 138 high total; **14 critical / 49 high running (in-use)**; 13 exploitable; 310 fixable. Failed policy rules include "Severity ≥ high AND Network attack vector AND Fixable" (145 hits).
-- **High-signal CVEs** (all `org.apache.struts:struts2-core 2.5.10`, exploitable, network attack vector — the initial-access surface; KEV status noted):
-  - **CVE-2017-5638** — critical, CVSS 9.8, exploitable, KEV. Content-Type/`Jakarta` OGNL RCE (the Equifax CVE). Fix 2.5.10.1. **Most probable initial-access vector.**
-  - **CVE-2018-11776** — critical-class, CVSS 8.1, exploitable, KEV. S2-057 namespace OGNL RCE. Fix 2.5.17.
-  - **CVE-2020-17530** — critical, CVSS 9.8, exploitable, KEV. S2-061 forced double-OGNL evaluation RCE. Fix 2.5.26.
-  - **CVE-2023-50164** — critical, CVSS 9.8, exploitable, KEV. Path-traversal -> file-upload RCE. Fix 2.5.33.
-  - **CVE-2017-9805** — high, CVSS 8.1, exploitable, KEV. S2-052 REST plugin XStream RCE. Fix 2.5.13.
-  - Also exploitable critical (CVSS 9.8): **CVE-2021-31805** (S2-062, fix 2.5.30), **CVE-2017-12611** (S2-053, fix 2.5.11), **CVE-2024-53677** (S2-067 file-upload RCE, fix 6.4.0).
-  - OS-level exploitable highs for completeness: **CVE-2024-2961** (glibc `libc6`/`libc-bin`/`locales`, iconv buffer overflow, fix 2.35-0ubuntu3.7) and **CVE-2022-41409** (`libpcre2-8-0`, no fix).
+- **High-signal CVEs** — all `org.apache.struts:struts2-core` 2.5.10, CVSS 9.8, network attack vector, exploitable, fixable. Any one is a sufficient initial-access vector; the image is pinned below the first fix (2.5.10.1) so every Struts2 RCE from 2017 onward applies:
+
+  | CVE | CVSS | Fix | Notes |
+  |---|---|---|---|
+  | **CVE-2017-5638** | 9.8 | 2.5.10.1 | S2-045 Jakarta `Content-Type` OGNL RCE — **CISA KEV**, the Equifax vector. **Most likely entry point.** |
+  | CVE-2018-11776 | 8.1 | 2.5.17 | S2-057 namespace OGNL RCE — **CISA KEV**. |
+  | CVE-2020-17530 | 9.8 | 2.5.26 | S2-061 forced double-OGNL evaluation — **CISA KEV**. |
+  | CVE-2023-50164 | 9.8 | 2.5.33 | Path-traversal file-upload RCE — **CISA KEV**. |
+  | CVE-2017-9805 | 8.1 | 2.5.13 | S2-052 REST XStream RCE — **CISA KEV**. |
+  | CVE-2021-31805 | 9.8 | 2.5.30 | S2-062 OGNL injection (incomplete S2-061 fix). |
+  | CVE-2017-12611 | 9.8 | 2.5.11 | S2-053 Freemarker tag RCE. |
+  | CVE-2024-53677 | 9.8 | 6.4.0 | S2-067 file-upload logic RCE. |
+
+  OS-level exploitable highs: **CVE-2024-2961** (glibc iconv buffer overflow, fix 2.35-0ubuntu3.7) and **CVE-2022-41409** (`libpcre2-8-0`, no fix).
 
 ### Correlation & confidence
 
