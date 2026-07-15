@@ -1,0 +1,61 @@
+name: Sysdig Secure - Image Scan
+
+# Highlights the Sysdig Secure image scanner (marketplace scan-action, which
+# wraps the sysdig-cli-scanner) against the intentionally-vulnerable
+# customer-portal image (Struts 2.5.10 / Tomcat 8.5 / JDK8).
+#
+# The scan runs the STANDARD Sysdig policy and fails the job on a failed
+# policy evaluation (stop-on-failed-policy-eval: true) - no `|| true` bypass -
+# so this workflow is expected to go red. The SARIF report is still uploaded
+# to the GitHub Security tab even when the policy gate fails.
+#
+# Requires repo secret SECURE_API_TOKEN (Sysdig Secure API token).
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/**"
+      - ".github/workflows/sysdig-scan.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/**"
+      - ".github/workflows/sysdig-scan.yml"
+  workflow_dispatch:
+
+env:
+  SYSDIG_SECURE_URL: https://app.au1.sysdig.com
+  IMAGE_TAG: customer-portal/portal:${{ github.run_number }}
+
+permissions:
+  contents: read
+  security-events: write   # required for the SARIF upload
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build the (vulnerable) portal image
+        run: docker build ./app --file ./app/Dockerfile --tag "${{ env.IMAGE_TAG }}"
+
+      - name: Sysdig Secure image scan
+        id: scan
+        uses: sysdiglabs/scan-action@v5
+        with:
+          image-tag: ${{ env.IMAGE_TAG }}
+          sysdig-secure-url: ${{ env.SYSDIG_SECURE_URL }}
+          sysdig-secure-token: ${{ secrets.SECURE_API_TOKEN }}
+          # Honest gate: fail the job when the standard policy evaluation fails.
+          stop-on-failed-policy-eval: true
+          stop-on-processing-error: true
+
+      - name: Upload SARIF report to the Security tab
+        # Runs even when the scan step fails the policy gate above.
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarifReport }}
