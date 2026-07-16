@@ -1,0 +1,67 @@
+name: Sysdig Secure - IaC Scan
+
+# Highlights the Sysdig Secure IaC scanner (marketplace scan-action in `iac`
+# mode, which wraps `sysdig-cli-scanner --iac`) against the Kubernetes
+# manifests in k8s/.
+#
+# The manifests are intentionally misconfigured (forbidden capabilities,
+# NET_RAW, runs as root, secrets in env vars, no resource limits), so the
+# scan fails the standard posture policy at the `high` severity threshold -
+# no bypass - and this workflow is expected to go red.
+#
+# The SARIF report is still uploaded to the GitHub Security tab even when the
+# policy gate fails, under its own category so it does not clash with the
+# VM image-scan results.
+#
+# Requires repo secret SECURE_API_TOKEN (Sysdig Secure API token).
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "k8s/**"
+      - ".github/workflows/sysdig-iac-scan.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "k8s/**"
+      - ".github/workflows/sysdig-iac-scan.yml"
+  workflow_dispatch:
+
+env:
+  SYSDIG_SECURE_URL: https://app.au1.sysdig.com
+
+permissions:
+  contents: read
+  security-events: write   # required for the SARIF upload
+
+jobs:
+  iac-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Sysdig Secure IaC scan
+        id: scan
+        uses: sysdiglabs/scan-action@v6
+        with:
+          mode: iac
+          iac-scan-path: ./k8s
+          recursive: true
+          # Fail the scan when a finding of at least this severity exists.
+          minimum-severity: high
+          sysdig-secure-url: ${{ env.SYSDIG_SECURE_URL }}
+          sysdig-secure-token: ${{ secrets.SECURE_API_TOKEN }}
+          # Honest gate: fail the job on a failed policy eval / scanner error.
+          stop-on-failed-policy-eval: true
+          stop-on-processing-error: true
+
+      - name: Upload SARIF report to the Security tab
+        # Runs even when the scan step fails the policy gate above; skipped if
+        # the IaC scan produced no SARIF output.
+        if: (success() || failure()) && steps.scan.outputs.sarifReport != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarifReport }}
+          category: sysdig-iac
