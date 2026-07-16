@@ -17,12 +17,17 @@ A public-facing Apache Tomcat workload (`portal-dd9dd888-ffwxk`, image `customer
   java (org.apache.catalina.startup.Bootstrap, pid 1262189, running since {{T_TOMCAT}}Z)
    ├─ bash -c "cp /usr/bin/env /dev/shm/.recon && /dev/shm/.recon | grep -iE '^(PG|DB_|DATABASE|POSTGRES)'; rm -f /dev/shm/.recon"
    │    └─ /dev/shm/.recon           (env renamed + staged in /dev/shm — {{T0}}Z, T1564/T1552.001)
-   ├─ bash -c "$(echo <base64> | base64 -d)"   (T1027 obfuscated loader — {{T1}}Z)
-   │    decodes to: PGPASSWORD=$DB_PASSWORD pg_dump -h $PGHOST -U $PGUSER -t customers --data-only $PGDATABASE
+   ├─ bash -c "$(echo <base64> | base64 -d)"   (T1027 obfuscated loader — {{T1}}Z; decodes to the pg_dump script below)
    │    └─ perl /usr/bin/pg_dump
    │    └─ /usr/lib/postgresql/14/bin/pg_dump -h postgres -U portal -t customers --data-only customers
    └─ bash -c "curl -sf --connect-timeout 3 http://169.254.169.254/latest/meta-data/iam/security-credentials/ 2>/dev/null"
         └─ curl 169.254.169.254 (IMDS, T1552.005 — {{T2}}Z)
+  ```
+- **Decoded base64 payload** (from the `Base64-encoded Shell Script Execution` hit):
+
+  ```bash
+  #!/bin/bash
+  PGPASSWORD=$DB_PASSWORD pg_dump -h $PGHOST -U $PGUSER -t customers --data-only $PGDATABASE
   ```
 - **Process evidence (parsed from `aiGeneratedDescription`):** "Java process linked to Apache Tomcat", "pg_dump", "copying `env` to `/dev/shm/.recon`", "filtering for database-related environment variables", "curl to the EC2 Instance Metadata Service for IAM security credentials". Note: the AI rollup leans toward "routine administrative activity" — the process tree contradicts that read.
 - **Resource:** `sysdn03` (EKS) / `customer-portal` / deployment `portal`, pod `portal-dd9dd888-ffwxk`, container `ba0d9712d1bf`, on node/EC2 `i-038244f3e51c4ade3` (`ip-192-168-80-223`), AWS account `059797578166`, ap-southeast-2.
@@ -135,6 +140,7 @@ The Tomcat-JVM-spawns-shell process tree correlates directly with the cluster of
 - **Confirm the Struts2 entry point:** check the Tomcat access logs on `portal-dd9dd888-ffwxk` for a malicious `Content-Type` / OGNL payload (`%{(#_='multipart/form-data')…}`) around {{HM}}Z to pin the exact CVE; remediate by upgrading `struts2-core` to ≥ 6.4.0 (clears all 7 RCEs) — image fix path via `/sysdig-remediate`.
 - **Assume `customers` PII is exfiltrated:** treat the `pg_dump --data-only customers` as a confirmed data-access event; scope the table contents and trigger breach-handling. Rotate the `portal` DB password (`$DB_PASSWORD`) and consider IMDSv2 enforcement (`HttpTokens=required`) to break the IMDS-theft step.
 - **Check the `portal` ServiceAccount RBAC** and whether `postgres` is reachable cluster-wide; confirm the egress NetworkPolicy actually blocks container -> external (IMDS is link-local and won't be caught by namespace egress rules).
+- **Harden the pod:** run the `portal` container non-root with a read-only root filesystem, and block `/dev/shm` execution and base64-piped shells at the container level. The `Execution from /dev/shm` and `Base64-encoded Shell Script Execution` policies already fired this run — consider promoting them from detect to **prevent/kill** so the next attempt is stopped, not just logged.
 
 ---
 **Audit:** event_id=18bc3a1fd67663c74df811d3543b5a73 | threat_group=019efcd4-a1bc-734a-a737-98e76c01b1d6 | sources=list_threats_engine_groups, list_threats_engine_threats_by_group, list_threats_engine_resources_by_group, list_runtime_events, get_event_process_tree, list_runtime_scan_results, get_scan_result | CTI: CISA KEV (public record)
