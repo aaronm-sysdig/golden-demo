@@ -3,23 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sysdig - Cluster Security Posture - sysdn03</title>
+<title>Sysdig - Cluster Security Posture - sysdn03 - Prepared for Mr Ci So (CISO)</title>
 <style>
   :root {
     color-scheme: light;
-    /* Sysdig brand */
     --brand-navy:   #0c1c2b;
     --brand-navy-2: #12263a;
     --brand-orange: #fb6023;
     --brand-orange-ink: #ff7a42;
-    /* surfaces & ink */
     --page:         #eef1f4;
     --surface:      #ffffff;
     --ink:          #10161d;
     --ink-2:        #55606b;
     --muted:        #8a94a0;
     --hair:         #e2e6ea;
-    /* status / severity (reserved, always labelled) */
     --sev-critical: #d03b3b;
     --sev-high:     #ec835a;
     --sev-medium:   #fab219;
@@ -36,8 +33,7 @@
     -webkit-font-smoothing: antialiased;
   }
   .sheet {
-    /* Baked-in scale — matches Chrome zoom ~150%. Tune this single value to taste. */
-    zoom: 1.5;
+    zoom: 1.4;
     max-width: 1180px;
     margin: 22px auto;
     background: var(--surface);
@@ -72,6 +68,21 @@
   .report-title h1 { margin: 0; font-size: 19px; font-weight: 700; }
   .report-title .meta { font-size: 12px; color: #a9b8c6; margin-top: 4px; }
   .report-title .meta b { color: #fff; font-weight: 600; }
+  .prepared { display:inline-block; margin-top:6px; font-size:11px; background:rgba(251,96,35,0.16); color:#ffd0bd; border:1px solid rgba(251,96,35,0.4); padding:2px 8px; border-radius:5px; font-weight:600; }
+
+  /* ---- Executive orientation (new-CISO framing) ---- */
+  .orient { padding: 18px 30px 20px; background: #f7f9fb; border-bottom: 1px solid var(--hair); display: grid; grid-template-columns: 1.55fr 1fr; gap: 24px; }
+  .orient h2 { font-size: 12px; text-transform: uppercase; letter-spacing:.6px; color: var(--ink-2); margin:0 0 8px; font-weight:700; }
+  .orient p { margin: 0 0 9px; font-size: 13px; color: var(--ink); }
+  .orient p:last-child { margin-bottom: 0; }
+  .orient .lede { font-size: 13.5px; }
+  .orient b { color: var(--ink); }
+  .orient code { background:#eef1f4; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .decision { background: #fff; border: 1px solid #f2d9cc; border-left: 4px solid var(--brand-orange); border-radius: 10px; padding: 13px 15px; }
+  .decision .dh { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing:.5px; color: var(--brand-orange); margin-bottom: 8px; }
+  .decision ol { margin: 0; padding-left: 17px; font-size: 12.5px; color: var(--ink-2); }
+  .decision li { margin-bottom: 7px; }
+  .decision li b { color: var(--ink); }
 
   /* ---- Threat banner ---- */
   .threat-banner {
@@ -97,7 +108,7 @@
   }
   .kpi { background: var(--surface); padding: 16px 18px 15px; }
   .kpi .label { font-size: 11px; color: var(--ink-2); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; min-height: 28px; }
-  .kpi .value { font-size: 33px; font-weight: 800; letter-spacing: -1px; margin-top: 6px; line-height: 1; }
+  .kpi .value { font-size: 31px; font-weight: 800; letter-spacing: -1px; margin-top: 6px; line-height: 1; }
   .kpi .value small { font-size: 15px; font-weight: 600; color: var(--muted); }
   .kpi .note { font-size: 11px; color: var(--muted); margin-top: 6px; }
   .kpi.alert .value { color: var(--sev-critical); }
@@ -115,7 +126,6 @@
   }
   h2.section::before { content: ""; width: 3px; height: 14px; background: var(--brand-orange); border-radius: 2px; }
 
-  /* stacked workload bars */
   .bar-row { margin-bottom: 13px; }
   .bar-head { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
   .bar-head .name { font-weight: 600; color: var(--ink); }
@@ -137,7 +147,6 @@
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 
-  /* runtime trend */
   .trend { display: flex; align-items: flex-end; gap: 5px; height: 120px; padding-top: 8px; border-bottom: 1px solid var(--hair); }
   .day { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 2px; }
   .day .stack { width: 60%; display: flex; flex-direction: column-reverse; gap: 2px; }
@@ -148,7 +157,6 @@
   .day .dl { font-size: 9px; color: var(--muted); }
   .trend-note { font-size: 11.5px; color: var(--muted); margin-top: 8px; }
 
-  /* incident card */
   .incident { margin-top: 22px; border: 1px solid var(--hair); border-radius: 10px; overflow: hidden; }
   .incident .ihead { background: #fdf2f0; padding: 11px 14px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; gap: 9px; }
   .incident .ihead .sev { background: var(--sev-critical); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
@@ -161,11 +169,9 @@
   .chain .step { background: #fff; border: 1px solid var(--hair); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 600; color: var(--ink); }
   .chain .arrow { color: var(--brand-orange); font-weight: 800; }
 
-  /* footer */
   .footer { padding: 14px 30px 18px; border-top: 1px solid var(--hair); background: #fafbfc; font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
   .footer b { color: var(--ink-2); }
 
-  /* ---- AI workload exposure band ---- */
   .ai-band { padding: 20px 26px 22px; border-bottom: 1px solid var(--hair); background: #fbfaff; }
   .ai-band h2.section::before { background: #6d5bd0; }
   .ai-tag { background: #6d5bd0; color:#fff; font-size:10px; font-weight:700; letter-spacing:.5px; padding:2px 7px; border-radius:4px; margin-left:2px; }
@@ -189,13 +195,13 @@
 
   @media (max-width: 860px) {
     .kpis { grid-template-columns: repeat(3, 1fr); }
-    .body { grid-template-columns: 1fr; }
+    .body, .orient { grid-template-columns: 1fr; }
     .col.left { border-right: none; border-bottom: 1px solid var(--hair); }
     .ai-grid { grid-template-columns: 1fr; }
   }
   @media print {
     body { background: #fff; }
-    .sheet { box-shadow: none; margin: 0; border: none; border-radius: 0; max-width: 100%; }
+    .sheet { box-shadow: none; margin: 0; border: none; border-radius: 0; max-width: 100%; zoom: 1; }
   }
 </style>
 </head>
@@ -217,6 +223,25 @@
         Cluster <b>sysdn03</b> &nbsp;&middot;&nbsp; EKS &nbsp;&middot;&nbsp; AWS <b>059797578166</b> / ap-southeast-2<br>
         Generated <b>{{GENERATED_AT}}</b> &nbsp;&middot;&nbsp; Runtime window: last 24h &amp; 14d trend
       </div>
+      <span class="prepared">Prepared for Mr Ci So &middot; incoming CISO</span>
+    </div>
+  </div>
+
+  <!-- Executive orientation for the new CISO -->
+  <div class="orient">
+    <div>
+      <h2>Where things stand - the one-minute read</h2>
+      <p class="lede"><b>sysdn03</b> is the EKS cluster running our customer-facing portal (Java/Tomcat) and its <code>customers</code> Postgres database, plus an AI workload and the usual platform components - <b>18 scanned assets</b> in all.</p>
+      <p>The cluster is quiet in day-to-day terms, but it is carrying one sharp, unresolved risk: <b>the customer portal runs a nine-year-old version of Apache Struts</b> with seven weaponized remote-code-execution flaws. <b>Today that risk materialized.</b> An attacker exploited the portal, dumped the <code>customers</code> table, and stole the pod's AWS credentials - the whole chain in a 12-second window. Sysdig detected every step in real time; it was not blocked, so we treat customer data and those cloud credentials as exposed.</p>
+      <p>Beyond that incident, the standing picture is a large fixable-vulnerability backlog (<b>89% of assets fail policy</b>), concentrated in the portal image and the node's OS packages. None of it is exotic - it is patch debt with clear owners.</p>
+    </div>
+    <div class="decision">
+      <div class="dh">What we need from you</div>
+      <ol>
+        <li><b>Approve an emergency rebuild</b> of <code>portal</code> off Struts 2.5.10 (the root cause). Treat it as actively exploitable until done.</li>
+        <li><b>Authorize IAM credential rotation</b> for the portal workload and a CloudTrail review of account 059797578166 since {{INCIDENT_TIME}}.</li>
+        <li><b>Endorse three standing controls:</b> enforce IMDSv2, run the container as non-root, and block pod egress to the metadata endpoint.</li>
+      </ol>
     </div>
   </div>
 
@@ -231,7 +256,7 @@
     <div class="kpi alert">
       <div class="accent-bar" style="background:var(--sev-critical)"></div>
       <div class="label">Active runtime incidents</div>
-      <div class="value" title="Open Threats-Engine groups on this cluster">1</div>
+      <div class="value" title="Open incidents on this cluster">1</div>
       <div class="note">Critical &middot; open</div>
     </div>
     <div class="kpi" title="Runtime detections in the last 24 hours by severity">
@@ -317,7 +342,6 @@
     <div class="col left">
       <h2 class="section">In-use vulnerability exposure - top workloads</h2>
 
-      <!-- portal 170 total is the scale max -->
       <div class="bar-row">
         <div class="bar-head"><span class="name">portal <em>customer-portal</em></span><span class="tot">170 in use</span></div>
         <div class="bar-track" title="portal:2.5.10 - Critical 29, High 78, Medium 63 (in use)">
@@ -337,11 +361,11 @@
       </div>
 
       <div class="bar-row">
-        <div class="bar-head"><span class="name">postgres <em>customer-portal</em></span><span class="tot">82 in use</span></div>
-        <div class="bar-track" title="postgres:13 - Critical 11, High 44, Medium 27 (in use)">
-          <div class="seg c" style="width:13.4%">11</div>
-          <div class="seg h" style="width:53.7%">44</div>
-          <div class="seg m" style="width:32.9%">27</div>
+        <div class="bar-head"><span class="name">postgres <em>customer-portal</em></span><span class="tot">84 in use</span></div>
+        <div class="bar-track" title="postgres:13 - Critical 13, High 45, Medium 26 (in use)">
+          <div class="seg c" style="width:15.3%">13</div>
+          <div class="seg h" style="width:52.9%">45</div>
+          <div class="seg m" style="width:30.6%">26</div>
         </div>
       </div>
 
@@ -373,7 +397,7 @@
       </div>
 
       <div class="host-callout">
-        Node host <b>ip-192-168-80-223</b>: <b>3 Critical / 2,749 High</b> in-use (OS-package findings) - the single largest driver of the cluster High total and end-of-life on 2025-08-12.
+        Node host <b>ip-192-168-80-223</b>: <b>3 Critical / 2,749 High</b> in-use (OS-package findings) - the single largest driver of the cluster High total, and end-of-life dated.
       </div>
 
       <div class="legend">
@@ -411,7 +435,7 @@
             <span class="step">IMDS cred theft</span>
           </div>
           <ul>
-            <li>Root cause: <code>struts2-core 2.5.10</code> - 7 exploitable CVSS-9.8 RCEs, incl. <b>CVE-2017-5638</b> (CISA KEV).</li>
+            <li>Root cause: <code>struts2-core 2.5.10</code> - 7 exploitable CVSS-9.8 RCEs, incl. <b>CVE-2017-5638</b>.</li>
             <li>Impact: <code>customers</code> table dumped via <code>pg_dump</code>; EC2 IAM credentials queried from IMDS.</li>
             <li>Detected end-to-end by runtime policy in a 12-second window; all steps parented by the Tomcat JVM.</li>
           </ul>
